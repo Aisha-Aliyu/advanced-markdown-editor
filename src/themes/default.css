@@ -48,6 +48,6 @@
   --statusbar-bg:   #0d0d0f;
   --statusbar-text: #6b6b76;
 
-  /* prose font only — display/sans come from :root */
+  /* prose font only: display/sans come from :root */
   --font-prose: 'Georgia', serif;
 }
