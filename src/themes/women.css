@@ -1,0 +1,53 @@
+[data-theme="women"] {
+  --bg-app:      #fdf5f8;
+  --bg-sidebar:  #fceef4;
+  --bg-surface:  #ffffff;
+  --bg-elevated: #fae4ef;
+  --bg-hover:    #f8d4e6;
+  --bg-active:   #f5c2db;
+
+  --text-primary:   #2d1020;
+  --text-secondary: #7a3858;
+  --text-muted:     #b06888;
+  --text-accent:    #d6317a;
+
+  --border:        #f0c0d8;
+  --border-strong: #e8a0c0;
+
+  --accent:        #d6317a;
+  --accent-hover:  #c4266e;
+  --accent-subtle: rgba(214, 49, 122, 0.1);
+  --accent-text:   #ffffff;
+
+  --editor-bg:             #fdf5f8;
+  --editor-text:           #2d1020;
+  --editor-gutter:         #fceef4;
+  --editor-line-highlight: rgba(214, 49, 122, 0.03);
+  --editor-selection:      rgba(214, 49, 122, 0.18);
+  --editor-cursor:         #d6317a;
+
+  --preview-bg:                #fceef4;
+  --preview-text:              #3d1828;
+  --preview-heading:           #1a0810;
+  --preview-link:              #d6317a;
+  --preview-code-bg:           #fae4ef;
+  --preview-blockquote-border: #d6317a;
+  --preview-blockquote-bg:     rgba(214, 49, 122, 0.06);
+  --preview-hr:                #f0c0d8;
+  --preview-table-border:      #f0c0d8;
+  --preview-table-header-bg:   #fae4ef;
+
+  --toolbar-bg:          #fceef4;
+  --toolbar-border:      #f0c0d8;
+  --toolbar-btn:         transparent;
+  --toolbar-btn-hover:   #f8d4e6;
+  --toolbar-btn-active:  #f5c2db;
+  --toolbar-icon:        #b06888;
+  --toolbar-icon-active: #d6317a;
+
+  --statusbar-bg:   #fae4ef;
+  --statusbar-text: #b06888;
+
+  /* Women theme uses elegant serif for prose reading */
+  --font-prose: 'Palatino Linotype', 'Book Antiqua', Georgia, serif;
+}

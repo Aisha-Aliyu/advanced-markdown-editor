@@ -1,0 +1,53 @@
+[data-theme="men"] {
+  --bg-app:      #090b10;
+  --bg-sidebar:  #0d1018;
+  --bg-surface:  #121620;
+  --bg-elevated: #181e2c;
+  --bg-hover:    #1c2438;
+  --bg-active:   #222c44;
+
+  --text-primary:   #c8d2f0;
+  --text-secondary: #8090b8;
+  --text-muted:     #505870;
+  --text-accent:    #4a9ef4;
+
+  --border:        #1c2438;
+  --border-strong: #283050;
+
+  --accent:        #4a9ef4;
+  --accent-hover:  #3888e0;
+  --accent-subtle: rgba(74, 158, 244, 0.12);
+  --accent-text:   #ffffff;
+
+  --editor-bg:             #090b10;
+  --editor-text:           #c8d2f0;
+  --editor-gutter:         #0d1018;
+  --editor-line-highlight: rgba(74, 158, 244, 0.04);
+  --editor-selection:      rgba(74, 158, 244, 0.22);
+  --editor-cursor:         #4a9ef4;
+
+  --preview-bg:                #0d1018;
+  --preview-text:              #a8b8d8;
+  --preview-heading:           #dce8ff;
+  --preview-link:              #4a9ef4;
+  --preview-code-bg:           #121620;
+  --preview-blockquote-border: #4a9ef4;
+  --preview-blockquote-bg:     rgba(74, 158, 244, 0.06);
+  --preview-hr:                #1c2438;
+  --preview-table-border:      #1c2438;
+  --preview-table-header-bg:   #121620;
+
+  --toolbar-bg:          #0d1018;
+  --toolbar-border:      #1c2438;
+  --toolbar-btn:         transparent;
+  --toolbar-btn-hover:   #181e2c;
+  --toolbar-btn-active:  #1c2438;
+  --toolbar-icon:        #8090b8;
+  --toolbar-icon-active: #4a9ef4;
+
+  --statusbar-bg:   #070910;
+  --statusbar-text: #505870;
+
+  /* Men theme: clean sans-serif prose */
+  --font-prose: 'Inter', system-ui, sans-serif;
+}

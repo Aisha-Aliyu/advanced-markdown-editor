@@ -1,0 +1,83 @@
+.app {
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-app);
+  overflow: hidden;
+  transition: background 0.25s ease, color 0.25s ease;
+}
+
+.body {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-height: 0;
+}
+
+.workspace {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  min-width: 0;
+}
+
+.editorPane {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+/* Focus mode */
+.app[data-focus="true"] .body {
+  padding: 0;
+}
+
+/* Responsive split: on small tablets show only one pane */
+@media (max-width: 900px) {
+  .workspace > *:nth-child(2) {
+    display: none;
+  }
+  .workspace > *:only-child,
+  .workspace > *:first-child {
+    flex: 1;
+  }
+}
+
+/* Full-bleed mobile */
+@media (max-width: 640px) {
+  .workspace { flex-direction: column; }
+}
+
+/* Presence bar */
+.presenceBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 14px;
+  height: 34px;
+  background: var(--bg-surface);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.presenceText { flex: 1; }
+
+.presenceActions {
+  display: flex;
+  gap: 4px;
+}
+
+.presenceBtn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 3px 7px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--transition), border-color var(--transition);
+}
+.presenceBtn:hover { background: var(--bg-hover); border-color: var(--border-strong); }

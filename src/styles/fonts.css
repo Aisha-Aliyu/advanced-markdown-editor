@@ -1,0 +1,15 @@
+@font-face {
+  font-family: 'Ciguatera';
+  src: url('/fonts/ciguatera.otf') format('otf');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Ciguatera';
+  src: url('/fonts/ciguatera.otf') format('otf');
+  font-weight: bold;
+  font-style: normal;
+  font-display: swap;
+}

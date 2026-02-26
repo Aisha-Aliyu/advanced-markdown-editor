@@ -1,0 +1,53 @@
+[data-theme="kids"] {
+  --bg-app:      #fffbf2;
+  --bg-sidebar:  #fff8e6;
+  --bg-surface:  #ffffff;
+  --bg-elevated: #fef3d6;
+  --bg-hover:    #fdecc0;
+  --bg-active:   #fce5aa;
+
+  --text-primary:   #2d2010;
+  --text-secondary: #6b5030;
+  --text-muted:     #a08050;
+  --text-accent:    #f97316;
+
+  --border:        #f5dfa0;
+  --border-strong: #e8c870;
+
+  --accent:        #f97316;
+  --accent-hover:  #ea6c0a;
+  --accent-subtle: rgba(249, 115, 22, 0.12);
+  --accent-text:   #ffffff;
+
+  --editor-bg:             #fffdf5;
+  --editor-text:           #2d2010;
+  --editor-gutter:         #fff8e6;
+  --editor-line-highlight: rgba(249, 115, 22, 0.04);
+  --editor-selection:      rgba(249, 115, 22, 0.2);
+  --editor-cursor:         #f97316;
+
+  --preview-bg:                #fff8e6;
+  --preview-text:              #3d3018;
+  --preview-heading:           #1a1008;
+  --preview-link:              #f97316;
+  --preview-code-bg:           #fef3d6;
+  --preview-blockquote-border: #f97316;
+  --preview-blockquote-bg:     rgba(249, 115, 22, 0.07);
+  --preview-hr:                #f5dfa0;
+  --preview-table-border:      #f5dfa0;
+  --preview-table-header-bg:   #fef3d6;
+
+  --toolbar-bg:          #fff8e6;
+  --toolbar-border:      #f5dfa0;
+  --toolbar-btn:         transparent;
+  --toolbar-btn-hover:   #fdecc0;
+  --toolbar-btn-active:  #fce5aa;
+  --toolbar-icon:        #a08050;
+  --toolbar-icon-active: #f97316;
+
+  --statusbar-bg:   #fef3d6;
+  --statusbar-text: #a08050;
+
+  /* Kids uses a rounder prose feel */
+  --font-prose: 'Georgia', sans-serif;
+}
