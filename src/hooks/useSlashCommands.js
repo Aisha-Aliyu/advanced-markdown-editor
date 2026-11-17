@@ -93,7 +93,7 @@ export const useSlashCommands = ({ viewRef, onInsert }) => {
 
   // Watch for "/" being typed: check editor content changes
   const handleEditorChange = useCallback(
-    (content, cursorPos) => {
+    () => {
       if (!viewRef?.current) return;
       const view = viewRef.current;
       const { state } = view;

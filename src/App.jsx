@@ -29,6 +29,49 @@ import "./themes/kids.css";
 import "./themes/women.css";
 import "./themes/men.css";
 
+// Documents are also kept in this browser, so they open instantly and work offline. Guest
+// documents and each account's documents are stored apart, so after a sign-out the next
+// person on this browser only sees guest documents. An account's copy stays for its next
+// sign-in, since it can hold edits the cloud doesn't have yet.
+const GUEST_DOCS  = "inkwell_docs";
+const LAST_USER   = "inkwell_user";
+const SORTED      = "inkwell_docs_sorted";
+const accountDocs = (userId) => `inkwell_docs_${userId}`;
+
+const storage = {
+  get(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* full or blocked */ }
+  },
+  remove(key) {
+    try { localStorage.removeItem(key); } catch { /* blocked */ }
+  },
+};
+
+const readDocs = (key) => {
+  try {
+    const docs = JSON.parse(storage.get(key));
+    return Array.isArray(docs) && docs.length > 0 ? docs : null;
+  } catch {
+    return null;
+  }
+};
+
+// Earlier versions saved an account's documents under GUEST_DOCS too. The first time this
+// version runs with someone signed in, that shared copy moves to their account. Nothing is
+// deleted: with nobody signed in, it can't be told apart from guest documents, so it stays.
+const sortSharedDocs = (userId) => {
+  if (storage.get(SORTED)) return;
+  const shared = storage.get(GUEST_DOCS);
+  if (userId && shared && !storage.get(accountDocs(userId))) {
+    storage.set(accountDocs(userId), shared);
+    if (storage.get(accountDocs(userId)) === shared) storage.remove(GUEST_DOCS);
+  }
+  storage.set(SORTED, "1");
+};
+
 const makeDoc = (title = "Untitled", content = "") => ({
   id: uuidv4(),
   title,
@@ -51,6 +94,9 @@ function App() {
   } = useStore();
 
   const [saveStatus, setSaveStatus]           = useState(SAVE_STATUS.IDLE);
+  // Goes up when documents change from outside the editor (another owner's list, a restored
+  // version). The editor only reads a document's text when it opens, so this reopens it.
+  const [editorGen, setEditorGen]             = useState(0);
   const [isPaletteOpen, setIsPaletteOpen]     = useState(false);
   const [isAuthOpen, setIsAuthOpen]           = useState(false);
   const [isVersionsOpen, setIsVersionsOpen]   = useState(false);
@@ -91,52 +137,83 @@ function App() {
     return () => window.removeEventListener("resize", handle);
   }, [setIsSidebarOpen]);
 
+  // Where the documents on screen are kept in this browser: GUEST_DOCS or accountDocs(id),
+  // or null while they change hands (nothing is saved then)
+  const docsKeyRef = useRef(GUEST_DOCS);
+  // Who the documents on screen belong to: undefined until Supabase first reports, null for a guest
+  const ownerRef = useRef(undefined);
+  // Counts changes of owner, so a slow fetch can't bring documents back after a sign-out
+  const authChangeRef = useRef(0);
+
+  const showDocs = (key, docs) => {
+    docsKeyRef.current = key;
+    const list = docs?.length ? docs : [makeDoc("Getting Started", STARTER_CONTENT)];
+    setDocuments(list);
+    setActiveDocId(list[0].id);
+    setEditorGen((gen) => gen + 1);
+  };
+
   // Auth listener
   useEffect(() => {
     const sub = onAuthChange(async (authUser) => {
       setUser(authUser);
-      if (authUser) {
-        const { docs, error } = await fetchDocuments();
-        if (!error && docs.length > 0) {
-          const mapped = docs.map((d) => ({ ...d, isSaved: true }));
-          setDocuments(mapped);
-          setActiveDocId(mapped[0].id);
-          return;
-        }
+      let userId = authUser?.id ?? null;
+      // Offline, Supabase can't renew an expired sign-in, so it reports nobody. The last
+      // account's documents stay until it can check again (a real sign-out is reported then).
+      const lastUser = storage.get(LAST_USER);
+      if (!userId && lastUser && !navigator.onLine) userId = lastUser;
+      // A token refresh or the like for the same person: the documents stay as they are
+      if (userId === ownerRef.current) return;
+      ownerRef.current = userId;
+      authChangeRef.current += 1;
+      const thisChange = authChangeRef.current;
+      // Nothing is saved in this browser until the new owner's documents are on screen
+      docsKeyRef.current = null;
+      sortSharedDocs(userId);
+
+      if (!userId) {
+        storage.remove(LAST_USER);
+        showDocs(GUEST_DOCS, readDocs(GUEST_DOCS));
+        return;
       }
-      loadLocalDocs();
+
+      storage.set(LAST_USER, userId);
+      const key = accountDocs(userId);
+      // Whatever happens here, showDocs must run, or nothing would be saved in this browser
+      let result = { docs: [], error: "not loaded" };
+      try {
+        result = await fetchDocuments();
+      } catch (err) {
+        console.error("Loading documents failed:", err);
+      }
+      if (authChangeRef.current !== thisChange) return;
+      const { docs, error } = result;
+      if (!error && docs?.length > 0) {
+        showDocs(key, docs.map((d) => ({ ...d, isSaved: true })));
+        return;
+      }
+      // Offline, or nothing in the cloud: this browser's copy, or else the guest documents come along
+      showDocs(key, readDocs(key) || readDocs(GUEST_DOCS));
     });
     return () => sub.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadLocalDocs = () => {
-    const saved = localStorage.getItem("inkwell_docs");
-    if (saved) {
-      try {
-        const docs = JSON.parse(saved);
-        if (docs.length > 0) {
-          setDocuments(docs);
-          setActiveDocId(docs[0].id);
-          return;
-        }
-      } catch { /* fall through */ }
-    }
-    const starter = makeDoc("Getting Started", STARTER_CONTENT);
-    setDocuments([starter]);
-    setActiveDocId(starter.id);
-  };
-
+  // Until Supabase reports the session, show what this browser showed last
   useEffect(() => {
-    if (!user) loadLocalDocs();
+    const lastUser = storage.get(LAST_USER);
+    const key = lastUser ? accountDocs(lastUser) : GUEST_DOCS;
+    showDocs(key, readDocs(key));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Autosave localStorage
   useEffect(() => {
-    if (!documents.length) return;
+    const key = docsKeyRef.current;
+    if (!documents.length || !key) return;
     const t = setTimeout(() => {
-      localStorage.setItem("inkwell_docs", JSON.stringify(documents));
+      // Skipped if the list on screen has changed hands since (for example after a sign-out)
+      if (docsKeyRef.current === key) storage.set(key, JSON.stringify(documents));
     }, 2000);
     return () => clearTimeout(t);
   }, [documents]);
@@ -153,7 +230,7 @@ function App() {
   const {
     isOpen: slashOpen, filtered: slashFiltered,
     selectedIndex: slashIndex, position: slashPos,
-    close: closeSlash, executeCommand: executeSlash,
+    executeCommand: executeSlash,
     handleEditorChange: detectSlash, setSelectedIndex: setSlashIndex,
   } = useSlashCommands({ viewRef: editorViewRef });
 
@@ -172,8 +249,13 @@ function App() {
       saveNow();
     } else {
       setSaveStatus(SAVE_STATUS.SAVING);
-      localStorage.setItem("inkwell_docs", JSON.stringify(documents));
-      setTimeout(() => { markDocSaved(activeDocId); setSaveStatus(SAVE_STATUS.SAVED); }, 400);
+      try {
+        if (docsKeyRef.current) localStorage.setItem(docsKeyRef.current, JSON.stringify(documents));
+        setTimeout(() => { markDocSaved(activeDocId); setSaveStatus(SAVE_STATUS.SAVED); }, 400);
+      } catch {
+        // Browser storage is full or blocked
+        setSaveStatus(SAVE_STATUS.ERROR);
+      }
     }
   }, [activeDocId, user, saveNow, documents, markDocSaved]);
 
@@ -186,6 +268,7 @@ function App() {
           : d
       )
     );
+    setEditorGen((gen) => gen + 1);
   }, [activeDocId, setDocuments]);
 
   // Export handlers wired directly
@@ -272,7 +355,7 @@ function App() {
           {(effectiveViewMode === "editor" || effectiveViewMode === "split") && (
             <div className={styles.editorPane}>
               <Editor
-                key={activeDocId}
+                key={`${editorGen}-${activeDocId}`}
                 content={activeDoc?.content || ""}
                 onChange={handleContentChange}
                 theme={theme}
@@ -305,8 +388,10 @@ function App() {
       />
 
       <CommandPalette  isOpen={isPaletteOpen}  onClose={() => setIsPaletteOpen(false)}  onCommand={handlePaletteCommand} />
-      <AuthModal       isOpen={isAuthOpen}      onClose={() => setIsAuthOpen(false)}      onSuccess={(u) => setUser(u)} />
-      <VersionHistory  isOpen={isVersionsOpen} onClose={() => setIsVersionsOpen(false)}  document={activeDoc} onRestore={handleRestore} />
+      {/* Keyed by account, so nothing typed or previewed carries over to the next person.
+          The keys differ because siblings with the same key confuse React. */}
+      <AuthModal       key={`auth-${user?.id || "guest"}`} isOpen={isAuthOpen}      onClose={() => setIsAuthOpen(false)}      onSuccess={(u) => setUser(u)} />
+      <VersionHistory  key={`versions-${user?.id || "guest"}`} isOpen={isVersionsOpen} onClose={() => setIsVersionsOpen(false)}  document={activeDoc} onRestore={handleRestore} />
       <ImageUpload     isOpen={isImageOpen}     onClose={() => setIsImageOpen(false)}     viewRef={editorViewRef} userId={user?.id} />
       <TableEditor     isOpen={isTableOpen}     onClose={() => setIsTableOpen(false)}     viewRef={editorViewRef} />
       <ExportModal     isOpen={isExportOpen}    onClose={() => setIsExportOpen(false)}    document={activeDoc} theme={theme} />

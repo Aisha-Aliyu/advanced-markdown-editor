@@ -29,16 +29,9 @@ export default defineConfig({
       },
       workbox: {
         globPatterns: ["**/*.{js,css,html,svg,png,woff2,ttf}"],
-        runtimeCaching: [
-          {
-            urlPattern: /^https:\/\/.*\.supabase\.co\/.*/i,
-            handler:    "NetworkFirst",
-            options: {
-              cacheName:  "supabase-cache",
-              expiration: { maxEntries: 20, maxAgeSeconds: 300 },
-            },
-          },
-        ],
+        // Supabase answers aren't cached: they hold a signed-in person's documents and
+        // account, and a cache shared by everyone on the device could show them to the
+        // next person. Offline writing works from the documents saved in localStorage.
       },
     }),
   ],

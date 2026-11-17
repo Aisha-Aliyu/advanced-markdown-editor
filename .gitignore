@@ -31,3 +31,6 @@ Thumbs.db
 # Cache
 .cache/
 *.tsbuildinfo
+
+# Screenshots from failed browser checks
+e2e-screens/

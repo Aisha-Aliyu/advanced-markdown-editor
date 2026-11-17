@@ -4,21 +4,36 @@ import styles from "./VersionHistory.module.css";
 import clsx from "clsx";
 
 const VersionHistory = ({ isOpen, onClose, document, onRestore }) => {
-  const [versions, setVersions]   = useState([]);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
-  const [previewing, setPreviewing] = useState(null);
+  // The fetched list and the version being previewed are each kept with the document they
+  // belong to, so nothing from another document is shown or restored. Until the open
+  // document's own list arrives, the list is loading.
+  const [loaded, setLoaded]   = useState({ docId: null, versions: [], error: "" });
+  const [preview, setPreview] = useState({ docId: null, version: null });
 
   useEffect(() => {
     if (!isOpen || !document?.id) return;
-    setLoading(true);
-    setError("");
-    fetchVersions(document.id).then(({ versions: v, error: err }) => {
-      setLoading(false);
-      if (err) { setError(err); return; }
-      setVersions(v);
-    });
+    const docId = document.id;
+    let current = true;
+    // A reply for a document that's no longer open is dropped
+    const done = (versions, error) => {
+      if (current) setLoaded({ docId, versions, error });
+    };
+    fetchVersions(docId)
+      .then(({ versions: v, error: err }) => done(err ? [] : v || [], err || ""))
+      .catch((err) => {
+        console.error("Loading versions failed:", err);
+        done([], "Version history isn't available right now.");
+      });
+    return () => { current = false; };
   }, [isOpen, document?.id]);
+
+  const docId      = document?.id;
+  const isLoaded   = Boolean(docId) && loaded.docId === docId;
+  const loading    = Boolean(docId) && !isLoaded;
+  const versions   = isLoaded ? loaded.versions : [];
+  const error      = isLoaded ? loaded.error : "";
+  const previewing = docId && preview.docId === docId ? preview.version : null;
+  const setPreviewing = (version) => setPreview({ docId, version });
 
   if (!isOpen) return null;
 

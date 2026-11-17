@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { signIn, signUp, sendMagicLink } from "../../services/authService";
 import styles from "./AuthModal.module.css";
 import clsx from "clsx";
@@ -11,51 +11,78 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [magicSent, setMagicSent] = useState(false);
+  // The email that just went out: { kind: "magic" or "confirm", email: the address it went to }
+  const [sent, setSent] = useState(null);
+  // Goes up with each submit and tab change, so a reply that arrives after the tab changed
+  // doesn't land on the newly chosen form
+  const attempt = useRef(0);
 
   if (!isOpen) return null;
 
   const reset = () => {
     setError("");
-    setMagicSent(false);
+    setSent(null);
   };
 
   const handleTabChange = (t) => {
+    attempt.current += 1;
     setTab(t);
     reset();
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
-    if (tab === "magic") {
-      const { error: err } = await sendMagicLink(email);
-      setLoading(false);
-      if (err) { setError(err); return; }
-      setMagicSent(true);
+    if (!email) {
+      setError("Please enter your email.");
       return;
     }
 
-    if (!email || !password) {
+    if (tab !== "magic" && !password) {
       setError("Please fill in all fields.");
-      setLoading(false);
       return;
     }
 
-    if (password.length < 8) {
+    if (tab !== "magic" && password.length < 8) {
       setError("Password must be at least 8 characters.");
-      setLoading(false);
       return;
     }
 
-    const fn = tab === "signup" ? signUp : signIn;
-    const { user, error: err } = await fn(email, password);
-    setLoading(false);
-    if (err) { setError(err); return; }
-    onSuccess(user);
-    onClose();
+    attempt.current += 1;
+    const thisAttempt = attempt.current;
+    const stillCurrent = () => attempt.current === thisAttempt;
+    // Kept as submitted, so editing the field while this runs can't change where it went
+    const address = email.trim();
+
+    setLoading(true);
+    try {
+      if (tab === "magic") {
+        const { error: err } = await sendMagicLink(address);
+        if (!stillCurrent()) return;
+        if (err) setError(err);
+        else setSent({ kind: "magic", email: address });
+        return;
+      }
+
+      const fn = tab === "signup" ? signUp : signIn;
+      const { user, needsConfirmation, error: err } = await fn(address, password);
+      // A finished sign-in counts even if the tab changed meanwhile
+      if (!err && !needsConfirmation) {
+        onSuccess(user);
+        onClose();
+        return;
+      }
+      if (!stillCurrent()) return;
+      if (err) setError(err);
+      // Supabase wants the email confirmed before the first sign-in, so there's no session yet
+      else setSent({ kind: "confirm", email: address });
+    } catch (err) {
+      console.error("Sign-in request failed:", err);
+      if (stillCurrent()) setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const tabLabels = { login: "Sign In", signup: "Sign Up", magic: "Magic Link" };
@@ -89,18 +116,25 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
 
         {/* Form */}
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
-          {magicSent ? (
+          {sent ? (
             <div className={styles.magicSuccess}>
               <div className={styles.magicIcon}>📬</div>
               <p className={styles.magicTitle}>Check your inbox</p>
-              <p className={styles.magicSub}>
-                We sent a magic link to <strong>{email}</strong>.<br/>
-                Click it to sign in instantly — no password needed.
-              </p>
+              {sent.kind === "magic" ? (
+                <p className={styles.magicSub}>
+                  We sent a magic link to <strong>{sent.email}</strong>.<br/>
+                  Click it to sign in instantly — no password needed.
+                </p>
+              ) : (
+                <p className={styles.magicSub}>
+                  We sent a confirmation link to <strong>{sent.email}</strong>.<br/>
+                  Open it to finish signing up. If it isn't there, check spam.
+                </p>
+              )}
               <button
                 type="button"
                 className={styles.backBtn}
-                onClick={() => setMagicSent(false)}
+                onClick={() => setSent(null)}
               >
                 Use a different email
               </button>

@@ -1,0 +1,57 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Lint and build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run build
+
+  sign-in:
+    name: Sign-in flows
+    runs-on: ubuntu-latest
+    env:
+      # A stand-in project: the test answers every request to this address itself
+      VITE_SUPABASE_URL: https://e2e-test.supabase.co
+      VITE_SUPABASE_ANON_KEY: e2e-anon-key
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      # Playwright (https://www.npmjs.com/package/playwright) is only a test tool here, so
+      # it isn't added to package.json
+      - name: Install Playwright
+        run: |
+          npm install --no-save playwright@1.63.0
+          npx playwright install --with-deps chromium
+      - name: Run the sign-in checks
+        run: |
+          npx vite preview --host 127.0.0.1 --port 4173 --strictPort &
+          for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173 > /dev/null && break; sleep 1; done
+          node e2e/auth.e2e.mjs
+      - name: Keep screenshots of failed checks
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screens
+          path: e2e-screens/
+          if-no-files-found: ignore
