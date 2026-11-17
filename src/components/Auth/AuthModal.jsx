@@ -11,13 +11,14 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [magicSent, setMagicSent] = useState(false);
+  // Which email just went out: "magic" (magic link) or "confirm" (sign-up confirmation)
+  const [sent, setSent] = useState(null);
 
   if (!isOpen) return null;
 
   const reset = () => {
     setError("");
-    setMagicSent(false);
+    setSent(null);
   };
 
   const handleTabChange = (t) => {
@@ -27,35 +28,45 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError("");
 
-    if (tab === "magic") {
-      const { error: err } = await sendMagicLink(email);
-      setLoading(false);
-      if (err) { setError(err); return; }
-      setMagicSent(true);
+    if (!email) {
+      setError("Please enter your email.");
       return;
     }
 
-    if (!email || !password) {
+    if (tab !== "magic" && !password) {
       setError("Please fill in all fields.");
-      setLoading(false);
       return;
     }
 
-    if (password.length < 8) {
+    if (tab !== "magic" && password.length < 8) {
       setError("Password must be at least 8 characters.");
-      setLoading(false);
       return;
     }
 
-    const fn = tab === "signup" ? signUp : signIn;
-    const { user, error: err } = await fn(email, password);
-    setLoading(false);
-    if (err) { setError(err); return; }
-    onSuccess(user);
-    onClose();
+    setLoading(true);
+    try {
+      if (tab === "magic") {
+        const { error: err } = await sendMagicLink(email);
+        if (err) { setError(err); return; }
+        setSent("magic");
+        return;
+      }
+
+      const fn = tab === "signup" ? signUp : signIn;
+      const { user, needsConfirmation, error: err } = await fn(email, password);
+      if (err) { setError(err); return; }
+      // Supabase wants the email confirmed before the first sign-in, so there's no session yet
+      if (needsConfirmation) { setSent("confirm"); return; }
+      onSuccess(user);
+      onClose();
+    } catch (err) {
+      console.error("Sign-in request failed:", err);
+      setError("Something went wrong. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const tabLabels = { login: "Sign In", signup: "Sign Up", magic: "Magic Link" };
@@ -89,18 +100,25 @@ const AuthModal = ({ isOpen, onClose, onSuccess }) => {
 
         {/* Form */}
         <form className={styles.form} onSubmit={handleSubmit} noValidate>
-          {magicSent ? (
+          {sent ? (
             <div className={styles.magicSuccess}>
               <div className={styles.magicIcon}>📬</div>
               <p className={styles.magicTitle}>Check your inbox</p>
-              <p className={styles.magicSub}>
-                We sent a magic link to <strong>{email}</strong>.<br/>
-                Click it to sign in instantly — no password needed.
-              </p>
+              {sent === "magic" ? (
+                <p className={styles.magicSub}>
+                  We sent a magic link to <strong>{email}</strong>.<br/>
+                  Click it to sign in instantly — no password needed.
+                </p>
+              ) : (
+                <p className={styles.magicSub}>
+                  We sent a confirmation link to <strong>{email}</strong>.<br/>
+                  Open it to finish signing up. If it isn't there, check spam.
+                </p>
+              )}
               <button
                 type="button"
                 className={styles.backBtn}
-                onClick={() => setMagicSent(false)}
+                onClick={() => setSent(null)}
               >
                 Use a different email
               </button>

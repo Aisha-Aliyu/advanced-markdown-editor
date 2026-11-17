@@ -20,7 +20,6 @@ export const useCollaboration = ({ docId, user, isEnabled }) => {
     id:    myId.current,
     color: myColor.current,
     name:  user?.email?.split("@")[0] || "Guest",
-    email: user?.email || null,
   };
 
   const broadcastCursor = useCallback((position) => {
