@@ -51,7 +51,7 @@ export const signUp = async (email, password) => {
     return {
       user: null,
       error: friendlyError(error, {
-        email_address_not_authorized: "We couldn't send the confirmation email to that address. Please try again later.",
+        email_address_not_authorized: "We can't send the confirmation email to that address yet.",
       }),
     };
   }
@@ -89,7 +89,7 @@ export const sendMagicLink = async (email) => {
   if (error) {
     return {
       error: friendlyError(error, {
-        email_address_not_authorized: "We can't send magic links to that address yet. Please sign up with a password instead.",
+        email_address_not_authorized: "We can't send magic links to that address yet. Please use a password instead.",
       }),
     };
   }
@@ -122,6 +122,8 @@ export const onAuthChange = (callback) => {
     callback(null);
     return { unsubscribe: () => {} };
   }
+  // The callback's promise is deliberately not returned: supabase-js waits for listeners while
+  // it holds its auth lock, and the callback makes Supabase calls that need that lock
   const { data } = supabase.auth.onAuthStateChange((_event, session) => {
     callback(session?.user || null);
   });

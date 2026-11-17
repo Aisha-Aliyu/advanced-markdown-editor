@@ -94,6 +94,9 @@ function App() {
   } = useStore();
 
   const [saveStatus, setSaveStatus]           = useState(SAVE_STATUS.IDLE);
+  // Goes up when documents change from outside the editor (another owner's list, a restored
+  // version). The editor only reads a document's text when it opens, so this reopens it.
+  const [editorGen, setEditorGen]             = useState(0);
   const [isPaletteOpen, setIsPaletteOpen]     = useState(false);
   const [isAuthOpen, setIsAuthOpen]           = useState(false);
   const [isVersionsOpen, setIsVersionsOpen]   = useState(false);
@@ -147,6 +150,7 @@ function App() {
     const list = docs?.length ? docs : [makeDoc("Getting Started", STARTER_CONTENT)];
     setDocuments(list);
     setActiveDocId(list[0].id);
+    setEditorGen((gen) => gen + 1);
   };
 
   // Auth listener
@@ -245,8 +249,13 @@ function App() {
       saveNow();
     } else {
       setSaveStatus(SAVE_STATUS.SAVING);
-      if (docsKeyRef.current) localStorage.setItem(docsKeyRef.current, JSON.stringify(documents));
-      setTimeout(() => { markDocSaved(activeDocId); setSaveStatus(SAVE_STATUS.SAVED); }, 400);
+      try {
+        if (docsKeyRef.current) localStorage.setItem(docsKeyRef.current, JSON.stringify(documents));
+        setTimeout(() => { markDocSaved(activeDocId); setSaveStatus(SAVE_STATUS.SAVED); }, 400);
+      } catch {
+        // Browser storage is full or blocked
+        setSaveStatus(SAVE_STATUS.ERROR);
+      }
     }
   }, [activeDocId, user, saveNow, documents, markDocSaved]);
 
@@ -259,6 +268,7 @@ function App() {
           : d
       )
     );
+    setEditorGen((gen) => gen + 1);
   }, [activeDocId, setDocuments]);
 
   // Export handlers wired directly
@@ -345,7 +355,7 @@ function App() {
           {(effectiveViewMode === "editor" || effectiveViewMode === "split") && (
             <div className={styles.editorPane}>
               <Editor
-                key={activeDocId}
+                key={`${editorGen}-${activeDocId}`}
                 content={activeDoc?.content || ""}
                 onChange={handleContentChange}
                 theme={theme}

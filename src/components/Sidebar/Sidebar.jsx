@@ -27,6 +27,9 @@ const Sidebar = ({
   onSignOut,
 }) => {
   const [search, setSearch] = useState("");
+  // The signed-in user whose sign-out just failed (the session is still in place). A new
+  // sign-in brings a new user object, so the message doesn't follow it.
+  const [signOutFailedFor, setSignOutFailedFor] = useState(null);
   const [renamingId, setRenamingId] = useState(null);
   const [renameValue, setRenameValue] = useState("");
   const [menuDocId, setMenuDocId] = useState(null);
@@ -220,11 +223,19 @@ return (
             </div>
             <div className={styles.userInfo}>
               <span className={styles.userEmail}>{user.email}</span>
-              <span className={styles.userBadge}>☁ Cloud sync on</span>
+              <span className={styles.userBadge}>
+                {signOutFailedFor === user ? "Couldn't sign out. Check your connection." : "☁ Cloud sync on"}
+              </span>
             </div>
             <button
               className={styles.signOutBtn}
-              onClick={async () => { await signOut(); onSignOut?.(); }}
+              onClick={async () => {
+                setSignOutFailedFor(null);
+                const { error } = await signOut();
+                // When it fails, Supabase keeps the session, so the screen stays signed in
+                if (error) setSignOutFailedFor(user);
+                else onSignOut?.();
+              }}
               title="Sign out"
             >
               ⏻

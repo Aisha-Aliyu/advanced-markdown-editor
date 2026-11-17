@@ -238,8 +238,8 @@ try {
     await page.getByRole("tab", { name: "Magic Link" }).click();
     token.release();
     // The request is over once the button stops saying Please wait
-    await page.getByRole("button", { name: "Magic Link" }).waitFor({ timeout: 5000 }).catch(() => {});
-    check("a reply that arrives after switching tabs stays off the new tab", (await page.getByRole("alert").count()) === 0);
+    const settled = await shows(page.getByRole("button", { name: "Magic Link" }));
+    check("a reply that arrives after switching tabs stays off the new tab", settled && (await page.getByRole("alert").count()) === 0);
     await context.close();
   }
   {
@@ -361,6 +361,65 @@ try {
     releaseB();
     const betaShown = await page.getByText("Snapshot two").waitFor({ timeout: 5000 }).then(() => true, () => false);
     check("Beta's own versions then appear, with no preview carried over", betaShown && (await page.getByText("Restore this version").count()) === 0);
+    await context.close();
+  }
+  {
+    // Supabase keeps the session when the sign-out request fails
+    const { context, page } = await openApp(browser, { "/auth/v1/logout": () => "abort" });
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    await page.getByTitle("Sign out").click();
+    const told = await shows(page.getByText("Couldn't sign out"));
+    check("a sign-out that fails says so and stays signed in", told && (await page.getByText("ada@example.com").count()) > 0);
+    await context.close();
+  }
+  {
+    const now = new Date().toISOString();
+    const docs = [
+      { id: "doc-a", title: "Alpha doc", content: "alpha today", created_at: now, updated_at: now },
+      { id: "doc-b", title: "Beta doc", content: "beta today", created_at: now, updated_at: now },
+    ];
+    const { context, page } = await openApp(browser, { "/rest/v1/documents": () => ({ json: docs }) });
+    const sidebar = page.locator("aside");
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    await sidebar.getByText("Beta doc").click();
+    await page.locator(".cm-content", { hasText: "beta today" }).waitFor({ timeout: 5000 });
+    // Coming back to the tab makes Supabase report the same sign-in again
+    await page.evaluate(() => window.dispatchEvent(new Event("visibilitychange")));
+    await page.waitForTimeout(1500);
+    const editor = await page.locator(".cm-content").textContent();
+    check("coming back to the tab keeps the open document", editor.includes("beta today"), editor.slice(0, 80));
+    await context.close();
+  }
+  {
+    // The same document id as a guest and in the account, with different text
+    const now = new Date().toISOString();
+    const guestDocs = [{ id: "doc-a", title: "Alpha doc", content: "guest words", createdAt: now, updatedAt: now, isSaved: false }];
+    const cloudDocs = [{ id: "doc-a", title: "Alpha doc", content: "cloud words", created_at: now, updated_at: now }];
+    const { context, page } = await openApp(browser, { "/rest/v1/documents": () => ({ json: cloudDocs }) }, { stored: { inkwell_docs: guestDocs } });
+    await page.locator(".cm-content", { hasText: "guest words" }).waitFor({ timeout: 5000 });
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    const loaded = await shows(page.locator(".cm-content", { hasText: "cloud words" }));
+    check("after signing in, the editor shows the account's text for a document it already had open", loaded);
+    await page.getByTitle("Sign out").click();
+    const back = await shows(page.locator(".cm-content", { hasText: "guest words" }));
+    check("after signing out, the editor shows the guest text again", back);
+    await context.close();
+  }
+  {
+    const now = new Date().toISOString();
+    const doc = { id: "doc-a", title: "Alpha doc", content: "current words", created_at: now, updated_at: now };
+    const version = { id: "va1", title: "Alpha doc", content: "older words", version_label: "Snapshot one", created_at: now };
+    const { context, page } = await openApp(browser, {
+      "/rest/v1/documents": () => ({ json: [doc] }),
+      "/rest/v1/document_versions": () => ({ json: [version] }),
+    });
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    await page.locator(".cm-content", { hasText: "current words" }).waitFor({ timeout: 5000 });
+    await page.getByTitle("Version history").click();
+    await page.getByText("Snapshot one").click();
+    await page.getByText("Restore this version").click();
+    const restored = await shows(page.locator(".cm-content", { hasText: "older words" }));
+    check("restoring a version puts its text in the editor", restored);
     await context.close();
   }
   {
