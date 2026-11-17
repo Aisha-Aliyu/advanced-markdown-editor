@@ -32,10 +32,17 @@ function defaultAnswers() {
   return {
     "/auth/v1/token": ({ body }) => (body.password === "right password" ? { json: session(body.email) } : authError(400, "invalid_credentials", "Invalid login credentials")),
     "/auth/v1/signup": ({ body }) =>
-      body.email.startsWith("confirm")
+      body.email.startsWith("blocked")
+        ? authError(400, "email_address_not_authorized", "Email address not authorized")
+        : body.email.startsWith("confirm")
         ? { json: { id: "u2", aud: "authenticated", role: "", email: body.email, confirmation_sent_at: new Date().toISOString(), app_metadata: {}, user_metadata: {}, identities: [{ id: "u2" }] } }
         : { json: session(body.email) },
-    "/auth/v1/otp": ({ body }) => (body.email.startsWith("blocked") ? authError(400, "email_address_not_authorized", "Email address not authorized") : { json: {} }),
+    "/auth/v1/otp": ({ body }) =>
+      body.email.startsWith("blocked")
+        ? authError(400, "email_address_not_authorized", "Email address not authorized")
+        : body.email.startsWith("soon")
+          ? authError(429, "over_email_send_rate_limit", "For security purposes, you can only request this after 30 seconds.")
+          : { json: {} },
     "/auth/v1/logout": () => ({ status: 204 }),
   };
 }
@@ -120,7 +127,19 @@ try {
   {
     const { context, page } = await openApp(browser);
     await submit(page, "Magic Link", "blocked@example.com");
-    check("an address Supabase won't email gets a clear message", /can't send emails to that address/.test(await alertText(page)));
+    check("a magic link to an address Supabase won't email points to passwords", /can't send magic links to that address yet\. Please sign up with a password/.test(await alertText(page)));
+    await context.close();
+  }
+  {
+    const { context, page } = await openApp(browser);
+    await submit(page, "Sign Up", "blocked@example.com", "long enough pw");
+    check("a sign-up whose confirmation email can't go out says so", /couldn't send the confirmation email/.test(await alertText(page)));
+    await context.close();
+  }
+  {
+    const { context, page } = await openApp(browser);
+    await submit(page, "Magic Link", "soon@example.com");
+    check("the wait between emails keeps Supabase's own message", /only request this after 30 seconds/.test(await alertText(page)));
     await context.close();
   }
   {

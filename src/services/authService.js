@@ -11,14 +11,19 @@ const MESSAGES = {
   email_exists: "That email already has an account. Try signing in instead.",
   weak_password: "That password is too weak. Please use at least 8 characters.",
   email_address_invalid: "Please enter a valid email address.",
-  email_address_not_authorized: "We can't send emails to that address yet. Please sign up with a password instead.",
+  email_address_not_authorized: "We can't send emails to that address yet.",
   over_email_send_rate_limit: "Too many emails have gone out in the last hour. Please try again later, or use a password.",
   over_request_rate_limit: "Too many attempts. Please wait a few minutes and try again.",
   signup_disabled: "New sign-ups are switched off right now.",
   otp_disabled: "Magic links are switched off right now. Please use a password.",
 };
 
-const friendlyError = (error) => {
+// overrides: messages for this action only (the same code can mean different things)
+const friendlyError = (error, overrides = {}) => {
+  // The short wait between emails to one address comes with its own clear message
+  // ("you can only request this after 30 seconds"), so that one is kept as it is
+  if (error.code === "over_email_send_rate_limit" && /after \d+ seconds?/i.test(error.message)) return error.message;
+  if (overrides[error.code]) return overrides[error.code];
   if (MESSAGES[error.code]) return MESSAGES[error.code];
   // A network failure, or a paused Supabase project, never reaches Supabase's error codes
   if (error.name === "AuthRetryableFetchError" || /failed to fetch|network/i.test(error.message)) {
@@ -41,7 +46,14 @@ export const signUp = async (email, password) => {
     password,
     options: { emailRedirectTo: redirectTo() },
   });
-  if (error) return { user: null, error: friendlyError(error) };
+  if (error) {
+    return {
+      user: null,
+      error: friendlyError(error, {
+        email_address_not_authorized: "We couldn't send the confirmation email to that address. Please try again later.",
+      }),
+    };
+  }
   return { user: data.user, needsConfirmation: !data.session, error: null };
 };
 
@@ -67,7 +79,13 @@ export const sendMagicLink = async (email) => {
     email: email.trim().toLowerCase(),
     options: { shouldCreateUser: true, emailRedirectTo: redirectTo() },
   });
-  if (error) return { error: friendlyError(error) };
+  if (error) {
+    return {
+      error: friendlyError(error, {
+        email_address_not_authorized: "We can't send magic links to that address yet. Please sign up with a password instead.",
+      }),
+    };
+  }
   return { error: null };
 };
 
