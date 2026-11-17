@@ -191,13 +191,13 @@ try {
   {
     const { context, page } = await openApp(browser);
     await submit(page, "Magic Link", "blocked@example.com");
-    check("a magic link to an address Supabase won't email points to passwords", /can't send magic links to that address yet\. Please sign up with a password/.test(await alertText(page)));
+    check("a magic link to an address Supabase won't email points to passwords", /can't send magic links to that address yet\. Please use a password/.test(await alertText(page)));
     await context.close();
   }
   {
     const { context, page } = await openApp(browser);
     await submit(page, "Sign Up", "blocked@example.com", "long enough pw");
-    check("a sign-up whose confirmation email can't go out says so", /couldn't send the confirmation email/.test(await alertText(page)));
+    check("a sign-up whose confirmation email can't go out says so", /can't send the confirmation email/.test(await alertText(page)));
     await context.close();
   }
   {
