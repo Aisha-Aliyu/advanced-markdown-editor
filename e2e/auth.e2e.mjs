@@ -51,6 +51,7 @@ function defaultAnswers() {
           ? authError(429, "over_email_send_rate_limit", "For security purposes, you can only request this after 30 seconds.")
           : { json: {} },
     "/auth/v1/logout": () => ({ status: 204 }),
+    "/auth/v1/user": () => ({ json: session("ada@example.com").user }),
   };
 }
 
@@ -68,16 +69,23 @@ function held(answer) {
   return { answer: async (request) => { await gate; return answer(request); }, release: () => release() };
 }
 
-async function openApp(browser, overrides = {}, { guestDocs } = {}) {
+// A request made with a signed-in person's token, rather than the public key
+const signedIn = (headers) => (headers.authorization || "") !== "Bearer e2e-anon-key";
+
+async function openApp(browser, overrides = {}, { stored = {} } = {}) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 800 }, serviceWorkers: "block" });
-  if (guestDocs) {
-    // Documents written as a guest earlier, in this browser
-    await context.addInitScript((docs) => {
-      try {
-        if (!localStorage.getItem("inkwell_docs")) localStorage.setItem("inkwell_docs", docs);
-      } catch { /* a frame without storage */ }
-    }, JSON.stringify(guestDocs));
-  }
+  // What this browser already holds when the page first loads (each key is set once)
+  await context.addInitScript((entries) => {
+    try {
+      for (const [key, value] of Object.entries(entries)) {
+        const done = `e2e_seeded_${key}`;
+        if (!sessionStorage.getItem(done)) {
+          localStorage.setItem(key, value);
+          sessionStorage.setItem(done, "1");
+        }
+      }
+    } catch { /* a frame without storage */ }
+  }, Object.fromEntries(Object.entries(stored).map(([key, value]) => [key, JSON.stringify(value)])));
   const answers = { ...defaultAnswers(), ...overrides };
   const requests = [];
   await context.route(`${SUPABASE}/**`, async (route) => {
@@ -94,7 +102,7 @@ async function openApp(browser, overrides = {}, { guestDocs } = {}) {
     let body = {};
     try { body = request.postDataJSON() || {}; } catch { /* not JSON */ }
     requests.push({ path: url.pathname, query: Object.fromEntries(url.searchParams), body });
-    const result = await answer({ body, url });
+    const result = await answer({ body, url, headers: request.headers() });
     if (result === "abort") return route.abort();
     const reply = { status: result.status || 200, headers: HEADERS };
     return route.fulfill(result.json === undefined ? { ...reply, body: "" } : { ...reply, json: result.json });
@@ -115,6 +123,10 @@ async function submit(page, tab, email, password) {
 }
 
 const alertText = (page) => page.getByRole("alert").textContent({ timeout: 5000 }).catch(() => "");
+const shows = (locator) => locator.waitFor({ timeout: 5000 }).then(() => true, () => false);
+const storedNow = (page) => page.evaluate(() => ({ ...localStorage }));
+// The browser copy of the documents is saved 2 seconds after a change
+const afterLocalSave = (page) => page.waitForTimeout(2500);
 
 const browser = await chromium.launch();
 try {
@@ -213,26 +225,81 @@ try {
     const now = new Date().toISOString();
     const guestDocs = [{ id: "guest-1", title: "Guest notes", content: "Written before signing in", createdAt: now, updatedAt: now, isSaved: false }];
     const accountDoc = { id: "cloud-1", title: "Account plan", content: "Private to the account", created_at: now, updated_at: now };
-    const { context, page } = await openApp(browser, { "/rest/v1/documents": () => ({ json: [accountDoc] }) }, { guestDocs });
+    let cloud = [accountDoc];
+    const { context, page } = await openApp(browser, { "/rest/v1/documents": () => ({ json: cloud }) }, { stored: { inkwell_docs: guestDocs } });
     const sidebar = page.locator("aside");
     await submit(page, "Sign In", "ada@example.com", "right password");
-    const shown = await sidebar.getByText("Account plan").waitFor({ timeout: 5000 }).then(() => true, () => false);
-    check("signing in shows the account's documents", shown);
-    await page.waitForTimeout(2500); // the browser copy is saved 2 seconds after a change
-    const stored = await page.evaluate(() => ({ ...localStorage }));
+    check("signing in shows the account's documents", await shows(sidebar.getByText("Account plan")));
+    await afterLocalSave(page);
+    let stored = await storedNow(page);
     check(
       "the account's copy is kept apart from the guest documents",
       (stored.inkwell_docs_u1 || "").includes("Account plan") && (stored.inkwell_docs || "").includes("Guest notes") && !(stored.inkwell_docs || "").includes("Account plan"),
     );
     await page.getByTitle("Sign out").click();
-    const guestBack = await sidebar.getByText("Guest notes").waitFor({ timeout: 5000 }).then(() => true, () => false);
-    check("after signing out, the guest documents are back", guestBack);
-    await page.waitForTimeout(2500);
-    const left = await page.evaluate(() => JSON.stringify({ ...localStorage }));
+    check("after signing out, the guest documents are back", await shows(sidebar.getByText("Guest notes")));
+    await afterLocalSave(page);
+    stored = await storedNow(page);
     check(
-      "after signing out, the account's documents are gone from the screen and from the browser",
-      (await page.getByText("Account plan").count()) === 0 && !left.includes("Account plan") && !left.includes("inkwell_user"),
-      left.slice(0, 300),
+      "after signing out, the account's documents are off the screen and out of the guest list",
+      (await page.getByText("Account plan").count()) === 0 && !(stored.inkwell_docs || "").includes("Account plan") && !("inkwell_user" in stored),
+    );
+    // When the cloud has nothing (offline, or never saved there), this browser's copy comes back
+    cloud = [];
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    check("signing back in brings the account's documents back from this browser", await shows(sidebar.getByText("Account plan")));
+    await context.close();
+  }
+  {
+    const { context, page } = await openApp(browser);
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    await page.getByTitle("Sign out").click();
+    await page.getByRole("button", { name: /Sign in to sync/ }).click();
+    const email = await page.inputValue("#email");
+    const password = await page.inputValue("#password");
+    check("after signing out, the sign-in window doesn't hold the last person's email or password", email === "" && password === "", email);
+    await context.close();
+  }
+  {
+    // A guest document that came along into the account keeps its id after signing out
+    const now = new Date().toISOString();
+    const guestDocs = [{ id: "doc-a", title: "Alpha doc", content: "alpha today", createdAt: now, updatedAt: now, isSaved: false }];
+    const version = { id: "va1", title: "Alpha doc", content: "alpha earlier", version_label: "Snapshot one", created_at: now };
+    const { context, page } = await openApp(
+      browser,
+      // Row Level Security: only the signed-in owner gets the versions
+      { "/rest/v1/document_versions": ({ headers }) => ({ json: signedIn(headers) ? [version] : [] }) },
+      { stored: { inkwell_docs: guestDocs } },
+    );
+    await submit(page, "Sign In", "ada@example.com", "right password");
+    await page.getByTitle("Sign out").waitFor({ timeout: 5000 });
+    await page.getByTitle("Version history").click();
+    await page.getByText("Snapshot one").click();
+    await page.getByText("Restore this version").waitFor({ timeout: 5000 });
+    await page.mouse.click(20, 400);
+    await page.getByTitle("Sign out").click();
+    await page.getByRole("button", { name: /Sign in to sync/ }).waitFor({ timeout: 5000 });
+    await page.getByTitle("Version history").click();
+    await page.getByText("No versions saved yet").waitFor({ timeout: 5000 }).catch(() => {});
+    const carried = (await page.getByText("Snapshot one").count()) + (await page.getByText("Restore this version").count());
+    check("after signing out, version history shows nothing from the account", carried === 0);
+    await context.close();
+  }
+  {
+    // An earlier version saved signed-in documents under the guest key. Someone still signed
+    // in when this version first loads gets that copy moved into their account.
+    const now = new Date().toISOString();
+    const shared = [{ id: "old-1", title: "Old shared copy", content: "Saved by the earlier version", created_at: now, updated_at: now, isSaved: true }];
+    const { context, page } = await openApp(browser, {}, { stored: { inkwell_docs: shared, "sb-e2e-test-auth-token": session("ada@example.com") } });
+    const sidebar = page.locator("aside");
+    check("someone signed in during the update keeps the copy the earlier version saved", await shows(sidebar.getByText("Old shared copy")));
+    await page.getByTitle("Sign out").click();
+    await shows(sidebar.getByText("Getting Started"));
+    await afterLocalSave(page);
+    const stored = await storedNow(page);
+    check(
+      "after signing out, that copy isn't a guest document, and it stays with the account",
+      (await page.getByText("Old shared copy").count()) === 0 && !(stored.inkwell_docs || "").includes("Old shared copy") && (stored.inkwell_docs_u1 || "").includes("Old shared copy"),
     );
     await context.close();
   }
