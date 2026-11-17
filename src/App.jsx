@@ -378,9 +378,10 @@ function App() {
       />
 
       <CommandPalette  isOpen={isPaletteOpen}  onClose={() => setIsPaletteOpen(false)}  onCommand={handlePaletteCommand} />
-      {/* Keyed by account, so nothing typed or previewed carries over to the next person */}
-      <AuthModal       key={user?.id || "guest"} isOpen={isAuthOpen}      onClose={() => setIsAuthOpen(false)}      onSuccess={(u) => setUser(u)} />
-      <VersionHistory  key={user?.id || "guest"} isOpen={isVersionsOpen} onClose={() => setIsVersionsOpen(false)}  document={activeDoc} onRestore={handleRestore} />
+      {/* Keyed by account, so nothing typed or previewed carries over to the next person.
+          The keys differ because siblings with the same key confuse React. */}
+      <AuthModal       key={`auth-${user?.id || "guest"}`} isOpen={isAuthOpen}      onClose={() => setIsAuthOpen(false)}      onSuccess={(u) => setUser(u)} />
+      <VersionHistory  key={`versions-${user?.id || "guest"}`} isOpen={isVersionsOpen} onClose={() => setIsVersionsOpen(false)}  document={activeDoc} onRestore={handleRestore} />
       <ImageUpload     isOpen={isImageOpen}     onClose={() => setIsImageOpen(false)}     viewRef={editorViewRef} userId={user?.id} />
       <TableEditor     isOpen={isTableOpen}     onClose={() => setIsTableOpen(false)}     viewRef={editorViewRef} />
       <ExportModal     isOpen={isExportOpen}    onClose={() => setIsExportOpen(false)}    document={activeDoc} theme={theme} />
