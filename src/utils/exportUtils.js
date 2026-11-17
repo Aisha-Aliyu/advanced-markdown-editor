@@ -99,9 +99,9 @@ export const exportHTML = (content, title, theme) => {
  * Export as PDF via browser print dialog
  * Opens a hidden iframe with styled content and triggers print
  */
-export const exportPDF = (content, title, theme) => {
+// The PDF always uses print colours (dark text on white), whatever the editor theme
+export const exportPDF = (content, title) => {
   const body   = parseMarkdown(content);
-  const colors = getThemeColors(theme);
 
   const html = `<!DOCTYPE html>
 <html>
@@ -326,6 +326,8 @@ const getThemeColors = (theme) => {
 
 const sanitizeFilename = (name) =>
   (name || "document")
+    // Control characters are stripped from file names on purpose
+    // eslint-disable-next-line no-control-regex
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, "")
     .replace(/\s+/g, "-")
     .slice(0, 100)

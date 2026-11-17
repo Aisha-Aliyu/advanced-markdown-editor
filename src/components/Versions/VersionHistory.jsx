@@ -4,21 +4,24 @@ import styles from "./VersionHistory.module.css";
 import clsx from "clsx";
 
 const VersionHistory = ({ isOpen, onClose, document, onRestore }) => {
-  const [versions, setVersions]   = useState([]);
-  const [loading, setLoading]     = useState(false);
-  const [error, setError]         = useState("");
+  // The versions and error for the document they were fetched for. Until that matches the
+  // open document, the list is loading.
+  const [loaded, setLoaded]       = useState({ docId: null, versions: [], error: "" });
   const [previewing, setPreviewing] = useState(null);
 
   useEffect(() => {
     if (!isOpen || !document?.id) return;
-    setLoading(true);
-    setError("");
+    let current = true;
     fetchVersions(document.id).then(({ versions: v, error: err }) => {
-      setLoading(false);
-      if (err) { setError(err); return; }
-      setVersions(v);
+      // A reply for a document that's no longer open is dropped
+      if (current) setLoaded({ docId: document.id, versions: err ? [] : v, error: err || "" });
     });
+    return () => { current = false; };
   }, [isOpen, document?.id]);
+
+  const loading  = Boolean(document?.id) && loaded.docId !== document.id;
+  const versions = loaded.versions;
+  const error    = loaded.error;
 
   if (!isOpen) return null;
 

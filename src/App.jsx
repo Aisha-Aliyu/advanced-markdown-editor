@@ -153,7 +153,7 @@ function App() {
   const {
     isOpen: slashOpen, filtered: slashFiltered,
     selectedIndex: slashIndex, position: slashPos,
-    close: closeSlash, executeCommand: executeSlash,
+    executeCommand: executeSlash,
     handleEditorChange: detectSlash, setSelectedIndex: setSlashIndex,
   } = useSlashCommands({ viewRef: editorViewRef });
 
