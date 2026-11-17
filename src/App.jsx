@@ -29,6 +29,34 @@ import "./themes/kids.css";
 import "./themes/women.css";
 import "./themes/men.css";
 
+// Documents are also kept in this browser, so they open instantly and work offline. Guest
+// documents and each account's documents are stored apart, and an account's copy is
+// removed when it signs out, so the next person on this browser can't open them.
+const GUEST_DOCS  = "inkwell_docs";
+const LAST_USER   = "inkwell_user";
+const accountDocs = (userId) => `inkwell_docs_${userId}`;
+
+const storage = {
+  get(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  },
+  set(key, value) {
+    try { localStorage.setItem(key, value); } catch { /* full or blocked */ }
+  },
+  remove(key) {
+    try { localStorage.removeItem(key); } catch { /* blocked */ }
+  },
+};
+
+const readDocs = (key) => {
+  try {
+    const docs = JSON.parse(storage.get(key));
+    return Array.isArray(docs) && docs.length > 0 ? docs : null;
+  } catch {
+    return null;
+  }
+};
+
 const makeDoc = (title = "Untitled", content = "") => ({
   id: uuidv4(),
   title,
@@ -91,52 +119,64 @@ function App() {
     return () => window.removeEventListener("resize", handle);
   }, [setIsSidebarOpen]);
 
+  // Where the documents on screen are kept in this browser: GUEST_DOCS or accountDocs(id)
+  const docsKeyRef = useRef(GUEST_DOCS);
+  // Counts sign-in changes, so a slow fetch can't bring documents back after a sign-out
+  const authChangeRef = useRef(0);
+
+  const showDocs = (key, docs) => {
+    docsKeyRef.current = key;
+    const list = docs?.length ? docs : [makeDoc("Getting Started", STARTER_CONTENT)];
+    setDocuments(list);
+    setActiveDocId(list[0].id);
+  };
+
   // Auth listener
   useEffect(() => {
     const sub = onAuthChange(async (authUser) => {
+      authChangeRef.current += 1;
+      const thisChange = authChangeRef.current;
       setUser(authUser);
-      if (authUser) {
-        const { docs, error } = await fetchDocuments();
-        if (!error && docs.length > 0) {
-          const mapped = docs.map((d) => ({ ...d, isSaved: true }));
-          setDocuments(mapped);
-          setActiveDocId(mapped[0].id);
-          return;
-        }
+      // The copy of an account that's no longer signed in leaves this browser
+      const lastUser = storage.get(LAST_USER);
+      if (lastUser && lastUser !== authUser?.id) storage.remove(accountDocs(lastUser));
+
+      if (!authUser) {
+        storage.remove(LAST_USER);
+        showDocs(GUEST_DOCS, readDocs(GUEST_DOCS));
+        return;
       }
-      loadLocalDocs();
+
+      storage.set(LAST_USER, authUser.id);
+      const key = accountDocs(authUser.id);
+      const { docs, error } = await fetchDocuments();
+      if (authChangeRef.current !== thisChange) return;
+      if (!error && docs.length > 0) {
+        showDocs(key, docs.map((d) => ({ ...d, isSaved: true })));
+        return;
+      }
+      // Offline, or a new account: this browser's copy, or else the guest documents come along
+      showDocs(key, readDocs(key) || readDocs(GUEST_DOCS));
     });
     return () => sub.unsubscribe();
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadLocalDocs = () => {
-    const saved = localStorage.getItem("inkwell_docs");
-    if (saved) {
-      try {
-        const docs = JSON.parse(saved);
-        if (docs.length > 0) {
-          setDocuments(docs);
-          setActiveDocId(docs[0].id);
-          return;
-        }
-      } catch { /* fall through */ }
-    }
-    const starter = makeDoc("Getting Started", STARTER_CONTENT);
-    setDocuments([starter]);
-    setActiveDocId(starter.id);
-  };
-
+  // Until Supabase reports the session, show what this browser showed last
   useEffect(() => {
-    if (!user) loadLocalDocs();
+    const lastUser = storage.get(LAST_USER);
+    const key = lastUser ? accountDocs(lastUser) : GUEST_DOCS;
+    showDocs(key, readDocs(key));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Autosave localStorage
   useEffect(() => {
     if (!documents.length) return;
+    const key = docsKeyRef.current;
     const t = setTimeout(() => {
-      localStorage.setItem("inkwell_docs", JSON.stringify(documents));
+      // Skipped if the list on screen has changed hands since (for example after a sign-out)
+      if (docsKeyRef.current === key) storage.set(key, JSON.stringify(documents));
     }, 2000);
     return () => clearTimeout(t);
   }, [documents]);
@@ -172,7 +212,7 @@ function App() {
       saveNow();
     } else {
       setSaveStatus(SAVE_STATUS.SAVING);
-      localStorage.setItem("inkwell_docs", JSON.stringify(documents));
+      localStorage.setItem(docsKeyRef.current, JSON.stringify(documents));
       setTimeout(() => { markDocSaved(activeDocId); setSaveStatus(SAVE_STATUS.SAVED); }, 400);
     }
   }, [activeDocId, user, saveNow, documents, markDocSaved]);

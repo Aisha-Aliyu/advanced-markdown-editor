@@ -7,9 +7,10 @@ const NOT_SET_UP = "Accounts aren't set up on this site right now. You can still
 const MESSAGES = {
   invalid_credentials: "That email and password don't match an account.",
   email_not_confirmed: "Please confirm your email first. The link is in your inbox (check spam too).",
-  user_already_exists: "That email already has an account. Try signing in instead.",
-  email_exists: "That email already has an account. Try signing in instead.",
-  weak_password: "That password is too weak. Please use at least 8 characters.",
+  user_already_exists: "That email already has an account. Try signing in, or use a magic link.",
+  email_exists: "That email already has an account. Try signing in, or use a magic link.",
+  // weak_password isn't here: the form already asks for 8 characters, so Supabase's own
+  // message names the rule that failed (for example a password found in a data breach)
   email_address_invalid: "Please enter a valid email address.",
   email_address_not_authorized: "We can't send emails to that address yet.",
   over_email_send_rate_limit: "Too many emails have gone out in the last hour. Please try again later, or use a password.",
@@ -53,6 +54,12 @@ export const signUp = async (email, password) => {
         email_address_not_authorized: "We couldn't send the confirmation email to that address. Please try again later.",
       }),
     };
+  }
+  // With "Confirm email" on, Supabase answers an address that already has an account like a
+  // new sign-up but sends nothing. The user it returns then has no identities.
+  const identities = data.user?.identities;
+  if (Array.isArray(identities) && identities.length === 0) {
+    return { user: null, error: MESSAGES.user_already_exists };
   }
   return { user: data.user, needsConfirmation: !data.session, error: null };
 };

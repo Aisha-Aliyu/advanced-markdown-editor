@@ -4,24 +4,36 @@ import styles from "./VersionHistory.module.css";
 import clsx from "clsx";
 
 const VersionHistory = ({ isOpen, onClose, document, onRestore }) => {
-  // The versions and error for the document they were fetched for. Until that matches the
-  // open document, the list is loading.
-  const [loaded, setLoaded]       = useState({ docId: null, versions: [], error: "" });
-  const [previewing, setPreviewing] = useState(null);
+  // The fetched list and the version being previewed are each kept with the document they
+  // belong to, so nothing from another document is shown or restored. Until the open
+  // document's own list arrives, the list is loading.
+  const [loaded, setLoaded]   = useState({ docId: null, versions: [], error: "" });
+  const [preview, setPreview] = useState({ docId: null, version: null });
 
   useEffect(() => {
     if (!isOpen || !document?.id) return;
+    const docId = document.id;
     let current = true;
-    fetchVersions(document.id).then(({ versions: v, error: err }) => {
-      // A reply for a document that's no longer open is dropped
-      if (current) setLoaded({ docId: document.id, versions: err ? [] : v, error: err || "" });
-    });
+    // A reply for a document that's no longer open is dropped
+    const done = (versions, error) => {
+      if (current) setLoaded({ docId, versions, error });
+    };
+    fetchVersions(docId)
+      .then(({ versions: v, error: err }) => done(err ? [] : v || [], err || ""))
+      .catch((err) => {
+        console.error("Loading versions failed:", err);
+        done([], "Version history isn't available right now.");
+      });
     return () => { current = false; };
   }, [isOpen, document?.id]);
 
-  const loading  = Boolean(document?.id) && loaded.docId !== document.id;
-  const versions = loaded.versions;
-  const error    = loaded.error;
+  const docId      = document?.id;
+  const isLoaded   = Boolean(docId) && loaded.docId === docId;
+  const loading    = Boolean(docId) && !isLoaded;
+  const versions   = isLoaded ? loaded.versions : [];
+  const error      = isLoaded ? loaded.error : "";
+  const previewing = docId && preview.docId === docId ? preview.version : null;
+  const setPreviewing = (version) => setPreview({ docId, version });
 
   if (!isOpen) return null;
 
