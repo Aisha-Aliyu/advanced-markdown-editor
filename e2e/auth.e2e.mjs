@@ -1,7 +1,10 @@
 // Checks the sign-in window against a stand-in for Supabase Auth, so it runs on CI
 // without a real project. Build with VITE_SUPABASE_URL=https://e2e-test.supabase.co, serve
 // the build with `vite preview`, then run: node e2e/auth.e2e.mjs
+import { mkdirSync } from "node:fs";
 import { chromium } from "playwright";
+
+mkdirSync("e2e-screens", { recursive: true });
 
 const APP = process.env.APP_URL || "http://127.0.0.1:4173";
 const SUPABASE = "https://e2e-test.supabase.co";
@@ -110,6 +113,10 @@ async function openApp(browser, overrides = {}, { stored = {} } = {}) {
   const page = await context.newPage();
   const errors = [];
   page.on("pageerror", (error) => errors.push(error.message));
+  // Console errors and warnings, printed when a check fails
+  page.on("console", (message) => {
+    if (["error", "warning"].includes(message.type())) consoleLines.push(`${message.type()}: ${message.text()}`.slice(0, 300));
+  });
   await page.goto(APP, { waitUntil: "networkidle" });
   return { context, page, requests, errors };
 }
@@ -120,6 +127,19 @@ async function submit(page, tab, email, password) {
   await page.fill("#email", email);
   if (password !== undefined) await page.fill("#password", password);
   await page.click('form button[type="submit"]');
+}
+
+// Shared by every page; what's printed when a check fails
+const consoleLines = [];
+
+// What's on screen and in the console, to explain a failed check
+async function diagnose(page, name) {
+  const modal = await page.locator('[role="tablist"]').count();
+  const selected = modal ? await page.locator('[role="tab"][aria-selected="true"]').textContent().catch(() => "") : "";
+  const alert = await page.getByRole("alert").textContent({ timeout: 200 }).catch(() => "");
+  const email = modal ? await page.inputValue("#email").catch(() => "(no email field)") : "";
+  await page.screenshot({ path: `e2e-screens/${name}.png` }).catch(() => {});
+  return `sign-in window open: ${modal > 0}, tab: ${selected}, alert: ${alert}, email field: ${email}; console: ${consoleLines.slice(-6).join(" | ")}`;
 }
 
 const alertText = (page) => page.getByRole("alert").textContent({ timeout: 5000 }).catch(() => "");
@@ -137,7 +157,8 @@ try {
     await page.fill("#password", "right password");
     await page.click('form button[type="submit"]');
     const signedIn = await page.getByText("ada@example.com").waitFor({ timeout: 5000 }).then(() => true, () => false);
-    check("the right password signs in and shows the account", signedIn && !(await page.locator("#password").isVisible()));
+    const closed = !(await page.locator("#password").isVisible());
+    check("the right password signs in and shows the account", signedIn && closed, signedIn && closed ? "" : await diagnose(page, "sign-in"));
     check("no errors in the page", errors.length === 0, errors.join(" | "));
     await context.close();
   }

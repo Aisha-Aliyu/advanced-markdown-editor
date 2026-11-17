@@ -48,3 +48,10 @@ jobs:
           npx vite preview --host 127.0.0.1 --port 4173 --strictPort &
           for i in $(seq 1 30); do curl -sf http://127.0.0.1:4173 > /dev/null && break; sleep 1; done
           node e2e/auth.e2e.mjs
+      - name: Keep screenshots of failed checks
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-screens
+          path: e2e-screens/
+          if-no-files-found: ignore
