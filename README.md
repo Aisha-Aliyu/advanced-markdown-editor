@@ -1,172 +1,109 @@
-# Inkwell ✍️
+# Inkwell
 
-**A production-ready markdown editor with real-time collaboration, cloud sync, and four distinct themes.**
+A markdown editor with cloud sync, version history, live presence and four themes. You can use it as a guest without an account, or sign in to sync your documents.
 
-🔗 **Live:** [inkwell-steel-kappa.vercel.app](https://inkwell-steel-kappa.vercel.app)
+Live demo: https://inkwell-steel-kappa.vercel.app
 
------
+Sign up with email and a password, or with a magic link. As a guest, your documents stay in your browser's localStorage and everything works offline.
 
-## Why I Built This
+## Why I built it
 
-Most markdown editors are either too minimal (no cloud save, no collaboration) or too bloated (Notion-level complexity). I wanted something in between — a focused writing tool that gets out of your way but has real production features underneath: auth, versioning, real-time presence, and exports that actually look good.
+Most markdown editors I tried were either too bare (no cloud saving, no collaboration) or too heavy, closer to Notion. I wanted something in between: a focused writing tool with real features underneath, like accounts, version history, live presence and exports that look good.
 
-I also used it as a challenge to build a full-stack product from scratch in five days, making every architectural decision myself: which packages to reach for, how to structure the auth flow, how to handle offline state, where the security boundaries live.
-
------
-
-## Live Demo
-
-|URL       |[inkwell-steel-kappa.vercel.app](https://inkwell-steel-kappa.vercel.app)|
-|----------|------------------------------------------------------------------------|
-|Auth      |Sign up with email or use magic link (no password needed)               |
-|Guest mode|Works fully offline, docs saved to localStorage                        |
-
------
+I also gave myself five days to build it from scratch as a full stack product, and I made every architecture call myself: which packages to use, how the auth flow works, how offline state is handled and where the security boundaries sit.
 
 ## Features
 
-**Editor**
+### Editor
 
-- CodeMirror 6: the same engine powering VS Code and Replit
-- Live split-pane preview (editor / split / preview modes)
-- Slash commands: type `/` to insert headings, tables, code blocks, callouts
-- Command palette: `Ctrl+K` to search all commands and themes
-- Full formatting toolbar with mobile bottom sheet
-- Keyboard shortcuts (`Ctrl+B`, `Ctrl+I`, `Ctrl+S`, `Ctrl+Shift+F`)
-- Focus mode: hides all chrome for distraction-free writing
-- Line numbers, syntax highlighting, word wrap
+- CodeMirror 6 for the editing itself.
+- Editor, split and preview modes, with the preview updating as you type.
+- Slash commands: type `/` to insert headings, tables, code blocks or callouts.
+- A command palette on `Ctrl+K` for every command and theme.
+- A formatting toolbar, which becomes a bottom sheet on mobile.
+- Keyboard shortcuts such as `Ctrl+B`, `Ctrl+I`, `Ctrl+S` and `Ctrl+Shift+F`.
+- Focus mode, which hides everything except the text.
+- Line numbers, syntax highlighting and word wrap.
 
-**Documents**
+### Documents
 
-- Sidebar with create, rename, duplicate, delete, and full-text search
-- Autosave: debounced 3 seconds after last keystroke
-- Version history: automatic snapshot every 5 minutes, with preview and one-click restore
-- Offline-first: works without internet, syncs when back online
+- A sidebar to create, rename, duplicate, delete and search your documents.
+- Autosave 3 seconds after you stop typing.
+- Version history with a snapshot every 5 minutes. You can preview any version and restore it in one click.
+- Offline first: it keeps working without internet and syncs when you're back online.
 
-**Themes**
+### Themes
 
-- 🌑 **Dark** — deep purple accent, professional
-- 🌈 **Kids** — warm amber tones, Ciguatera font throughout
-- 🌸 **Women** — rose palette, elegant Palatino prose
-- 🌊 **Men** — navy blue, clean Inter sans-serif
+- Dark, with a deep purple accent.
+- Kids, in warm amber with the Ciguatera font throughout.
+- Women, a rose palette with Palatino for the text.
+- Men, navy blue with Inter.
 
-Every theme is implemented as a CSS custom property set, swapping themes is a single `data-theme` attribute change with zero JavaScript re-renders.
+Each theme is a set of CSS custom properties, so switching themes only changes one `data-theme` attribute and nothing re-renders.
 
-**Collaboration**
+### Collaboration
 
-- Supabase Realtime presence — see who’s in the document live
-- Colour-coded avatar stack per document
-- Live join/leave events with animated indicators
+- Supabase Realtime presence shows who else has the document open.
+- Each person gets a coloured avatar, and you can see people join and leave as it happens.
 
-**Export**
+### Export
 
-- Markdown `.md` — raw file, works with Obsidian, Bear, any editor
-- HTML `.html` — fully self-contained with theme-matched styles
-- PDF — browser print dialog, `@page` margins, print-optimised typography
-- Word `.docx` — XML-based, preserves headings, lists, blockquotes
+- Markdown (`.md`), which opens in Obsidian, Bear or any other editor.
+- HTML (`.html`), a single self-contained file styled to match your theme.
+- PDF through the browser's print dialog, with print margins and typography set up.
+- Word (`.docx`), keeping headings, lists and blockquotes.
 
-**Images**
+### Images
 
-- Drag-and-drop or click-to-browse upload
-- Stored in Supabase Storage under `userId/filename`
-- File type allowlist: JPEG, PNG, GIF, WebP
-- 5MB size limit enforced client-side before upload
-- URL insertion as fallback (no auth required)
+- Drag and drop an image, or click to browse.
+- Uploads go to Supabase Storage under `userId/filename`.
+- Only JPEG, PNG, GIF and WebP are allowed, and files over 5 MB are rejected before upload.
+- You can also insert an image by URL, which doesn't need an account.
 
-**Visual Table Editor**
+### Table editor
 
-- Add and remove rows and columns interactively
-- Live Markdown preview as you edit
-- Max 8 columns × 12 rows with sensible guards
+- Add and remove rows and columns visually, with a live markdown preview.
+- Up to 8 columns and 12 rows.
 
------
+## Tech stack
 
-## Tech Stack
+- React 18 and Vite.
+- CodeMirror 6 for the editor.
+- marked for parsing markdown, and DOMPurify to sanitise the HTML.
+- Supabase for auth, the Postgres database with row level security, file storage and realtime presence.
+- CSS Modules and CSS custom properties for styling.
+- The Ciguatera display font, with system fonts as the fallback.
+- file-saver and the browser's print API for exports, so no export needs a server.
+- vite-plugin-pwa and Workbox, so it installs as an app and works offline.
+- Vercel for hosting.
 
-|Layer    |Choice                                  |Why                                              |
-|---------|----------------------------------------|-------------------------------------------------|
-|Framework|React 18 + Vite                         |Fast HMR, small bundles, no CRA baggage          |
-|Editor   |CodeMirror 6                            |Modular, mobile-friendly, best-in-class perf     |
-|Markdown |marked v12 + DOMPurify v3               |Fast parse, XSS-safe sanitization                |
-|Auth & DB|Supabase (Postgres + RLS)               |Auth, storage, and realtime in one platform      |
-|Realtime |Supabase Realtime channels              |Presence tracking without a WebSocket server     |
-|Storage  |Supabase Storage                        |Co-located with auth, easy RLS policies          |
-|Styling  |CSS Modules + CSS custom properties     |Scoped styles, zero runtime overhead             |
-|Font     |Ciguatera (display), system-ui fallbacks|Distinctive brand feel                           |
-|Export   |file-saver + browser print API          |No server needed for any export format           |
-|PWA      |vite-plugin-pwa + Workbox               |Installable, offline-capable                     |
-|Deploy   |Vercel                                  |Edge CDN, auto-deploy on push, env var management|
+## Decisions I made
 
------
+### Why CSS custom properties for themes?
 
-## Architecture Decisions
+Switching themes with CSS variables is instant. There's no re-render and no toggling classes on hundreds of elements, because one attribute change on `<html>` cascades everywhere. It also means the theme reaches inside the CodeMirror editor without any JavaScript bridge.
 
-**Why CSS custom properties for themes instead of styled-components or Tailwind?**
-Theme switching with CSS variables is instant — no re-render, no class toggling on hundreds of elements. One attribute change on `<html>` cascades everywhere. It also means the theme works inside the CodeMirror editor without any JS bridge.
+### Why Supabase?
 
-**Why Supabase over Firebase?**
-Postgres means real relational data with row-level security policies — a single SQL line like `auth.uid() = user_id` enforces access control at the database level, not the application level. That’s a meaningful security boundary that Firebase’s client SDK can’t match.
+It's real Postgres, and row level security lets one rule, `auth.uid() = user_id`, enforce access in the database instead of in app code.
 
-**Why offline-first with localStorage?**
-Most writing happens without interruption, but auth sessions expire, servers go down, and mobile connections drop. By writing to localStorage first and syncing to Supabase second, the editor never loses a character. The autosave hook treats localStorage as the source of truth and Supabase as the backup.
+### Why offline first with localStorage?
 
-**Why a custom autosave hook instead of a library?**
-The logic has three independent concerns: debouncing keystrokes (3s), periodic version snapshots (5min), and online/offline detection. A single custom hook keeps all three co-located and testable in isolation.
+Sessions expire, servers go down and mobile connections drop. The editor writes to localStorage first and syncs to Supabase second, so none of that loses your work. The autosave hook treats localStorage as the source of truth and Supabase as the backup.
 
------
+### Why a custom autosave hook?
 
-## Project Structure
+It handles three separate jobs: debouncing keystrokes (3 seconds), taking version snapshots (every 5 minutes) and watching whether you're online. Keeping them in one hook keeps them together and easy to test on their own.
 
-```
-inkwell/
-├── public/
-│   ├── fonts/               # Ciguatera font files
-│   └── icons/icon.svg       # PWA icon
-├── src/
-│   ├── components/
-│   │   ├── Auth/            # Login modal (email, password, magic link)
-│   │   ├── Collaboration/   # Presence avatars
-│   │   ├── Editor/          # CodeMirror wrapper, slash menu, image upload, table editor
-│   │   ├── Export/          # Export modal (MD, HTML, PDF, DOCX)
-│   │   ├── Layout/          # Status bar
-│   │   ├── Preview/         # Sanitized HTML preview
-│   │   ├── Sidebar/         # Document list, theme switcher, user profile
-│   │   ├── Toolbar/         # Formatting toolbar + mobile bottom sheet
-│   │   ├── UI/              # Command palette
-│   │   └── Versions/        # Version history panel
-│   ├── hooks/
-│   │   ├── useAutosave.js       # Debounced save + version snapshots
-│   │   ├── useCollaboration.js  # Supabase Realtime presence
-│   │   ├── useEditor.js         # CodeMirror 6 setup
-│   │   ├── useOnlineStatus.js
-│   │   └── useSlashCommands.js
-│   ├── lib/supabase.js          # Client with graceful degradation
-│   ├── services/
-│   │   ├── authService.js
-│   │   ├── documentService.js   # CRUD + version saves
-│   │   └── imageService.js      # Upload with validation
-│   ├── store/useStore.js        # Global state (no Redux)
-│   ├── themes/                  # One CSS file per theme
-│   ├── utils/
-│   │   ├── exportUtils.js       # All four export formats
-│   │   ├── markdownUtils.js     # parse, sanitize, toolbar actions
-│   │   └── rateLimiter.js
-│   └── App.jsx
-├── vercel.json                  # Security headers + SPA rewrites
-└── vite.config.js               # PWA plugin + Workbox config
-```
-
------
-
-## Local Setup
+## Run it locally
 
 ```bash
 git clone https://github.com/Aisha-Aliyu/advanced-markdown-editor.git
-cd inkwell
+cd advanced-markdown-editor
 npm install
 ```
 
-Create `.env`:
+Create a `.env` file:
 
 ```env
 VITE_APP_NAME=Inkwell
@@ -174,7 +111,7 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-Run the database setup SQL in **Supabase → SQL Editor**:
+In your Supabase project, open the SQL Editor and run this to create the tables and access rules:
 
 ```sql
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -209,42 +146,27 @@ CREATE POLICY "Users own versions" ON document_versions
   FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
 ```
 
-```bash
-npm run dev
-```
-
------
+Then start it with `npm run dev`.
 
 ## Security
 
-Built security-first throughout, not bolted on at the end.
+- XSS: all markdown goes through `DOMPurify.sanitize()` before it touches the DOM.
+- SQL injection: the Supabase JS client sends parameterised queries, never SQL built from strings.
+- Access control: row level security on every table, with `auth.uid() = user_id` checked by the database.
+- File uploads: a MIME type allowlist, a 5 MB cap, cleaned filenames and storage paths scoped to each user.
+- Auth: sessions are managed by Supabase with `autoRefreshToken`, with no hand-rolled JWT code.
+- Content limits: titles are capped at 200 characters and content at 500 KB before any write.
+- HTTP headers: CSP, HSTS, X-Frame-Options and Permissions-Policy are set in `vercel.json`.
+- API keys: the Supabase anon key is public by design. It can only do what the row level security policies allow, and the `service_role` key is never used in client code.
 
-|Area          |Approach                                                                       |
-|--------------|-------------------------------------------------------------------------------|
-|XSS           |All markdown parsed through `DOMPurify.sanitize()` before any DOM insertion    |
-|SQL injection |Supabase JS SDK parameterized queries — no string-concatenated SQL             |
-|Access control|Row Level Security on every table — `auth.uid() = user_id` enforced at DB level|
-|File uploads  |MIME type allowlist, 5MB cap, sanitized filenames, user-scoped storage paths   |
-|Auth          |Supabase-managed sessions, `autoRefreshToken`, no custom JWT handling          |
-|Content limits|Title capped at 200 chars, content at 500KB before any write                   |
-|HTTP headers  |CSP, HSTS, X-Frame-Options, Permissions-Policy via Vercel edge config          |
-|API keys      |Supabase anon key is public by design — all protection lives in RLS policies   |
+## What I'd add next
 
-
-> **Note:** The `VITE_SUPABASE_ANON_KEY` in the frontend is intentionally public. It only permits what the RLS policies allow. The `service_role` key is never used in client code.
-
------
-
-## What I’d Add Next
-
-- **Supabase Edge Functions** for server-side document validation, currently the 500KB cap is client-side only
-- **Y.js** for true concurrent editing with cursor merging, not just presence indicators
-- **Nonce-based CSP** to replace `unsafe-inline`, the last remaining XSS vector class
-- **Mobile swipe gestures** — swipe right to open sidebar, swipe left to switch view mode
-- **Per-document social previews** via a Vercel Edge Function generating `og:image` on the fly
-
------
+- Supabase Edge Functions to validate documents on the server. Right now the 500 KB cap is only checked in the browser.
+- Y.js for true simultaneous editing with merged cursors, beyond presence.
+- A nonce based CSP to replace `unsafe-inline`, the last class of XSS risk left.
+- Swipe gestures on mobile: right to open the sidebar, left to switch view mode.
+- Social preview images for each document, generated by a Vercel Edge Function.
 
 ## License
 
-MIT — use it, fork it, build on it.
+MIT. Use it, fork it, build on it.
